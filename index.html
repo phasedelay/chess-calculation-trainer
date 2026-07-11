@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chess Calculation Trainer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#171717">
+<meta name="apple-mobile-web-app-title" content="Calc Trainer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#171717;--panel:#252525;--text:#f4f4f4;--muted:#bdbdbd;--accent:#f4c95d;--good:#85e89d;--bad:#ff8f8f;--border:#505050}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;line-height:1.35}
+.app{max-width:650px;margin:0 auto;padding:12px}
+h1{font-size:25px;text-align:center;margin:4px 0}
+.subtitle{text-align:center;color:var(--muted);font-size:13px;margin-bottom:10px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+.topgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat{background:#1e1e1e;border:1px solid #444;border-radius:10px;padding:10px;text-align:center}
+.stat .big{font-size:22px;font-weight:700;color:var(--accent)}
+.step-title{font-size:21px;font-weight:700;color:var(--accent);margin-bottom:8px}
+.prompt{font-size:17px;margin:7px 0}
+.small{font-size:13px;color:var(--muted)}
+input[type=text],textarea,select{width:100%;background:#111;color:var(--text);border:1px solid #666;border-radius:9px;padding:9px;font-size:16px;margin:5px 0 9px}
+textarea{min-height:62px;resize:vertical}
+label{display:block;margin:8px 0;font-size:16px}
+.checkrow{display:flex;gap:9px;align-items:flex-start;margin:9px 0}
+.checkrow input{transform:scale(1.25);margin-top:4px}
+button{border:0;border-radius:10px;padding:10px 13px;font-size:16px;font-weight:700;cursor:pointer;margin:4px 4px 4px 0;background:var(--accent);color:#181818}
+button.secondary{background:#303030;color:var(--text);border:1px solid #666}
+button.danger{background:var(--bad);color:#181818}
+button:disabled{opacity:.35;cursor:not-allowed}
+.nav{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.hidden{display:none}
+.progress{height:10px;border:1px solid #444;background:#0d0d0d;border-radius:999px;overflow:hidden;margin-bottom:10px}
+.progressin{height:100%;width:0;background:var(--accent);transition:width .2s}
+.candidate{background:#1d1d1d;border:1px solid #444;border-radius:10px;padding:10px;margin-bottom:10px}
+.radioChoice{background:#171717;border:1px solid #4d4d4d;border-radius:10px;padding:10px;margin:8px 0}
+.radioChoice input{transform:scale(1.2);margin-right:8px}
+.score{font-size:34px;font-weight:800;color:var(--good);text-align:center}
+.warning{color:var(--bad);font-weight:700}
+.summary{white-space:pre-wrap;background:#111;border:1px solid #555;border-radius:10px;padding:10px;font-size:14px}
+.historyItem{background:#1a1a1a;border:1px solid #444;border-radius:10px;padding:10px;margin:8px 0}
+.flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+@media(max-width:520px){.app{padding:9px}.step-title{font-size:19px}.prompt{font-size:16px}}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>CHESS CALCULATION TRAINER</h1>
+<div class="subtitle">Train the thinking process, not just the move</div>
+
+<div class="card">
+<div class="topgrid">
+<div class="stat"><div class="big" id="moveCount">0</div><div>Moves trained</div></div>
+<div class="stat"><div class="big" id="thinkTime">00:00</div><div>Current think time</div></div>
+<div class="stat"><div class="big" id="liveScore">0%</div><div>Calculation score</div></div>
+<div class="stat"><div class="big" id="blunderStat">0 / 0</div><div>Blunder checks</div></div>
+</div>
+</div>
+
+<div class="progress"><div class="progressin" id="progress"></div></div>
+
+<section class="card step" id="step0">
+<div class="step-title">1. STOP</div>
+<div class="prompt">Do not move yet.</div>
+<div class="checkrow"><input type="checkbox" id="stopCheck"><label for="stopCheck">I paused before moving.</label></div>
+<button onclick="startMove()">Start thinking</button>
+</section>
+
+<section class="card step hidden" id="step1">
+<div class="step-title">2. WHAT CHANGED?</div>
+<div class="checkrow"><input type="checkbox" id="threat"><label for="threat">I identified the opponent's threat.</label></div>
+<div class="checkrow"><input type="checkbox" id="stronger"><label for="stronger">I noticed what became stronger.</label></div>
+<div class="checkrow"><input type="checkbox" id="weaker"><label for="weaker">I noticed what became weaker.</label></div>
+<textarea id="changeNote" placeholder="Optional note"></textarea>
+</section>
+
+<section class="card step hidden" id="step2">
+<div class="step-title">3. CANDIDATE MOVES</div>
+<input type="text" id="cand1" placeholder="Candidate 1">
+<input type="text" id="cand2" placeholder="Candidate 2">
+<input type="text" id="cand3" placeholder="Candidate 3 (optional)">
+<div class="small">Use at least two serious candidates unless the move is forced.</div>
+</section>
+
+<section class="card step hidden" id="step3">
+<div class="step-title">4. CALCULATE CANDIDATE 1</div>
+<div class="candidate" id="cand1Label">Candidate 1</div>
+<input type="text" id="c1a" placeholder="My move">
+<input type="text" id="c1b" placeholder="Opponent's best reply">
+<input type="text" id="c1c" placeholder="My answer">
+<select id="c1eval"><option value="">Evaluation</option><option>Better</option><option>Equal</option><option>Unclear</option><option>Worse</option></select>
+</section>
+
+<section class="card step hidden" id="step4">
+<div class="step-title">5. CALCULATE CANDIDATE 2</div>
+<div class="candidate" id="cand2Label">Candidate 2</div>
+<input type="text" id="c2a" placeholder="My move">
+<input type="text" id="c2b" placeholder="Opponent's best reply">
+<input type="text" id="c2c" placeholder="My answer">
+<select id="c2eval"><option value="">Evaluation</option><option>Better</option><option>Equal</option><option>Unclear</option><option>Worse</option></select>
+</section>
+
+<section class="card step hidden" id="step5">
+<div class="step-title">6. OPTIONAL CANDIDATE 3</div>
+<div class="candidate" id="cand3Label">Candidate 3</div>
+<input type="text" id="c3a" placeholder="My move">
+<input type="text" id="c3b" placeholder="Opponent's best reply">
+<input type="text" id="c3c" placeholder="My answer">
+<select id="c3eval"><option value="">Evaluation</option><option>Better</option><option>Equal</option><option>Unclear</option><option>Worse</option></select>
+</section>
+
+<section class="card step hidden" id="step6">
+<div class="step-title">7. COMPARE</div>
+<div class="radioChoice"><label><input type="radio" name="best" value="1"><span id="best1">Candidate 1</span></label></div>
+<div class="radioChoice"><label><input type="radio" name="best" value="2"><span id="best2">Candidate 2</span></label></div>
+<div class="radioChoice"><label><input type="radio" name="best" value="3"><span id="best3">Candidate 3</span></label></div>
+<textarea id="compareNote" placeholder="Why is this the best move?"></textarea>
+</section>
+
+<section class="card step hidden" id="step7">
+<div class="step-title">8. BLUNDER CHECK</div>
+<div class="prompt warning">The Move button stays locked until these are checked.</div>
+<div class="checkrow"><input type="checkbox" class="bc" id="bc1"><label for="bc1">What would my opponent play immediately?</label></div>
+<div class="checkrow"><input type="checkbox" class="bc" id="bc2"><label for="bc2">Did I leave a piece or tactic hanging?</label></div>
+<div class="checkrow"><input type="checkbox" class="bc" id="bc3"><label for="bc3">Did I check checks, captures and threats?</label></div>
+<div class="checkrow"><input type="checkbox" class="bc" id="bc4"><label for="bc4">Is my king safe after this move?</label></div>
+<button id="moveBtn" disabled onclick="completeMove()">MOVE</button>
+</section>
+
+<section class="card step hidden" id="step8">
+<div class="step-title">MOVE COMPLETED</div>
+<div class="score" id="moveScore">0%</div>
+<div class="prompt" style="text-align:center">Make the move on chess.com.</div>
+<button onclick="newMove()">Train next move</button>
+<button class="secondary" onclick="endGame()">End game</button>
+</section>
+
+<section class="card hidden" id="gameSummary">
+<div class="step-title">GAME SUMMARY</div>
+<div class="score" id="finalScore">0%</div>
+<div id="summaryText" class="summary"></div>
+<div class="flex">
+<button onclick="saveGame()">Save game</button>
+<button class="secondary" onclick="newGame()">New game</button>
+<button class="secondary" onclick="showHistory()">History</button>
+</div>
+</section>
+
+<section class="card hidden" id="historyPanel">
+<div class="step-title">TRAINING HISTORY</div>
+<div id="historyList"></div>
+<button class="secondary" onclick="hideHistory()">Close history</button>
+<button class="danger" onclick="clearHistory()">Clear history</button>
+</section>
+
+<div class="nav" id="nav">
+<button class="secondary" onclick="prevStep()">Back</button>
+<button onclick="nextStep()">Next</button>
+<button class="danger" onclick="newGame()">Reset game</button>
+</div>
+</div>
+
+<script>
+let currentStep=0,timer=null,seconds=0;
+let game={moves:[],start:new Date().toISOString()};
+const $=id=>document.getElementById(id);
+function formatTime(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+function showStep(n){
+ currentStep=Math.max(0,Math.min(8,n));
+ document.querySelectorAll('.step').forEach((x,i)=>x.classList.toggle('hidden',i!==currentStep));
+ $('progress').style.width=((currentStep+1)/9*100)+'%';
+ updateLabels();updateLiveScore();
+}
+function nextStep(){if(currentStep<8)showStep(currentStep+1)}
+function prevStep(){if(currentStep>0)showStep(currentStep-1)}
+function startMove(){
+ if(!$('stopCheck').checked)$('stopCheck').checked=true;
+ seconds=0;$('thinkTime').textContent='00:00';
+ clearInterval(timer);timer=setInterval(()=>{seconds++;$('thinkTime').textContent=formatTime(seconds)},1000);
+ showStep(1);
+}
+function updateLabels(){
+ const a=$('cand1').value.trim()||'Candidate 1';
+ const b=$('cand2').value.trim()||'Candidate 2';
+ const c=$('cand3').value.trim()||'Candidate 3';
+ $('cand1Label').textContent=a;$('cand2Label').textContent=b;$('cand3Label').textContent=c;
+ $('best1').textContent=a;$('best2').textContent=b;$('best3').textContent=c;
+}
+['cand1','cand2','cand3'].forEach(id=>$(id).addEventListener('input',updateLabels));
+document.querySelectorAll('.bc').forEach(x=>x.addEventListener('change',()=>{
+ $('moveBtn').disabled=!Array.from(document.querySelectorAll('.bc')).every(c=>c.checked);
+ updateLiveScore();
+}));
+document.querySelectorAll('input,textarea,select').forEach(x=>x.addEventListener('change',updateLiveScore));
+function calcCurrentScore(){
+ let pts=0,max=0;
+ ['stopCheck','threat','stronger','weaker','bc1','bc2','bc3','bc4'].forEach(id=>{max++;if($(id).checked)pts++});
+ max+=2;if($('cand1').value.trim())pts++;if($('cand2').value.trim())pts++;
+ max+=6;['c1a','c1b','c1c','c2a','c2b','c2c'].forEach(id=>{if($(id).value.trim())pts++});
+ max+=1;if(document.querySelector('input[name=best]:checked'))pts++;
+ return Math.round(100*pts/max);
+}
+function updateLiveScore(){$('liveScore').textContent=calcCurrentScore()+'%'}
+function chosenMove(){
+ const r=document.querySelector('input[name=best]:checked');if(!r)return '';
+ return $('cand'+r.value).value.trim()||('Candidate '+r.value);
+}
+function completeMove(){
+ clearInterval(timer);
+ const score=calcCurrentScore();
+ game.moves.push({number:game.moves.length+1,time:seconds,score:score,candidates:[$('cand1').value,$('cand2').value,$('cand3').value].filter(Boolean).length,best:chosenMove(),blunder:true});
+ $('moveScore').textContent=score+'%';
+ $('moveCount').textContent=game.moves.length;
+ $('blunderStat').textContent=game.moves.filter(m=>m.blunder).length+' / '+game.moves.length;
+ showStep(8);
+}
+function resetMoveFields(){
+ document.querySelectorAll('.step input[type=text],.step textarea').forEach(x=>x.value='');
+ document.querySelectorAll('.step input[type=checkbox],.step input[type=radio]').forEach(x=>x.checked=false);
+ document.querySelectorAll('.step select').forEach(x=>x.selectedIndex=0);
+ $('moveBtn').disabled=true;$('thinkTime').textContent='00:00';seconds=0;
+}
+function newMove(){resetMoveFields();showStep(0)}
+function endGame(){
+ clearInterval(timer);
+ document.querySelectorAll('.step').forEach(x=>x.classList.add('hidden'));
+ $('nav').classList.add('hidden');$('gameSummary').classList.remove('hidden');
+ const n=game.moves.length;
+ const avg=n?Math.round(game.moves.reduce((a,m)=>a+m.score,0)/n):0;
+ const avgTime=n?Math.round(game.moves.reduce((a,m)=>a+m.time,0)/n):0;
+ const two=n?game.moves.filter(m=>m.candidates>=2).length:0;
+ const three=n?game.moves.filter(m=>m.candidates>=3).length:0;
+ $('finalScore').textContent=avg+'%';
+ $('summaryText').textContent=
+`Moves trained: ${n}
+Average calculation score: ${avg}%
+Average think time: ${formatTime(avgTime)}
+At least 2 candidates: ${two} / ${n}
+3 candidates: ${three} / ${n}
+Blunder checks completed: ${game.moves.filter(m=>m.blunder).length} / ${n}
+
+Next goal:
+${avg<70?'Slow down and complete every stage.':avg<85?'Keep using two serious candidates consistently.':'Excellent process discipline. Keep the routine calm and accurate.'}`;
+}
+function saveGame(){
+ const history=JSON.parse(localStorage.getItem('calcTrainerHistory')||'[]');
+ const avg=game.moves.length?Math.round(game.moves.reduce((a,m)=>a+m.score,0)/game.moves.length):0;
+ history.unshift({date:new Date().toLocaleString(),moves:game.moves.length,score:avg});
+ localStorage.setItem('calcTrainerHistory',JSON.stringify(history.slice(0,50)));
+ alert('Game saved on this browser.');
+}
+function showHistory(){
+ $('historyPanel').classList.remove('hidden');
+ const h=JSON.parse(localStorage.getItem('calcTrainerHistory')||'[]');
+ $('historyList').innerHTML=h.length?h.map(x=>`<div class="historyItem"><strong>${x.date}</strong><br>Moves: ${x.moves}<br>Score: ${x.score}%</div>`).join(''):'<div class="small">No saved games yet.</div>';
+}
+function hideHistory(){$('historyPanel').classList.add('hidden')}
+function clearHistory(){if(confirm('Clear all saved history?')){localStorage.removeItem('calcTrainerHistory');showHistory()}}
+function newGame(){
+ clearInterval(timer);game={moves:[],start:new Date().toISOString()};
+ resetMoveFields();$('moveCount').textContent='0';$('liveScore').textContent='0%';$('blunderStat').textContent='0 / 0';
+ $('gameSummary').classList.add('hidden');$('historyPanel').classList.add('hidden');$('nav').classList.remove('hidden');showStep(0);
+}
+showStep(0);
+</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'))}</script>
+</body>
+</html>
